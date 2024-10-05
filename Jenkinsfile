@@ -51,4 +51,24 @@ pipeline {
                 script {
                     // Define the mapping between friendly playbook names and actual file names
                     def playbookMap = [
-      
+                        'password-policy': 'password-policy_playbook.yml',
+                        'install-docker': 'install-docker_playbook.yml',
+                        'remove-kasperskyagent': 'remove-kasperskyagent_playbook.yml'
+                    ]
+
+                    // Get the actual playbook file name based on the chosen friendly name
+                    def playbookFile = playbookMap[params.PLAYBOOK]
+
+                    if (!playbookFile) {
+                        error "Playbook not found for selection: ${params.PLAYBOOK}"
+                    }
+
+                    // Run the Ansible playbook with the selected host filter
+                    sh """
+                    ansible-playbook -i ${INVENTORY_PATH} --limit ${env.SELECTED_HOST} Playbook/${playbookFile}
+                    """
+                }
+            }
+        }
+    }
+}
