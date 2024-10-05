@@ -22,7 +22,7 @@ pipeline {
                     
                     // Run the Ansible playbook with the selected inventory
                     sh """
-                    ansible-playbook -i ${inventoryFile} Playbook/install-apache-container.yml
+                    ansible-playbook -i ${inventoryFile} Playbook/password-policy.yml
                     """
                 }
             }
