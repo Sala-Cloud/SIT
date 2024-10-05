@@ -6,5 +6,8 @@ if [ "$#" -ne 1 ]; then
   exit 1
 fi
 
+# Make sure the script is running with execution permissions
+echo "Executing script with inventory file: $1"
+
 # Extract IPs/hosts from the inventory file
 grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$1" | awk '{print $1}' | sort -u
