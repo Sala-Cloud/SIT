@@ -22,11 +22,11 @@ pipeline {
                     // Run the get_hosts.sh script to fetch the list of hosts
                     def hostList = sh(script: "bash configs/get_hosts.sh ${inventoryFile}", returnStdout: true).trim().split('\n')
                     
-                    // Combine host list into a comma-separated string for user input
+                    // Filter options for user input
                     def hostChoices = hostList.join(',')
                     echo "Available hosts: ${hostChoices}"
                     
-                    // Prompt user for input - note that this is a simple text input for hosts
+                    // Prompt user for input
                     def selectedHosts = input(
                         id: 'userInput', 
                         message: 'Select hosts to deploy', 
