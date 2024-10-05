@@ -5,19 +5,18 @@ pipeline {
         choice(name: 'ENVIRONMENT', choices: ['PROD', 'UAT', 'SIT'], description: 'Choose the environment to deploy')
         choice(name: 'PLAYBOOK', choices: ['password-policy', 'install-docker', 'remove-kasperskyagent'], description: 'Choose the playbook to deploy')
         string(name: 'HOST_FILTER', defaultValue: '', description: 'Enter a host or IP to filter (optional)')
-        string(name: 'UPDATE_REPO', defaultValue: '', description: 'Click to update the repository from GitHub.')
+        boolean(name: 'UPDATE_REPO', defaultValue: false, description: 'Check to update the repository from GitHub.')
     }
 
     stages {
         stage('Update Repository') {
             when {
-                expression { params.UPDATE_REPO == 'Update' }
+                expression { params.UPDATE_REPO == true }
             }
             steps {
                 script {
-                    // Clone or update the repository
-                    git branch: 'main', url: 'https://github.com/Sala-Cloud/SIT.git'
-                    echo "Repository updated successfully."
+                    // Call the script to update the repository
+                    sh './configs/update_repo.sh'
                 }
             }
         }
