@@ -1,17 +1,17 @@
 pipeline {
     agent any
 
-    environment {
-        // Define the path to the inventory file based on the selected environment
-        INVENTORY_PATH = "configs/${params.ENVIRONMENT}_inventory.ini"
-    }
-
     parameters {
         // Choose the environment (inventory)
         choice(name: 'ENVIRONMENT', choices: ['PROD', 'UAT', 'SIT'], description: 'Choose the environment to deploy')
 
         // Choose the playbook to run
         choice(name: 'PLAYBOOK', choices: ['password-policy', 'install-docker', 'remove-kasperskyagent'], description: 'Choose the playbook to deploy')
+    }
+
+    environment {
+        // Path to inventory file based on the selected environment
+        INVENTORY_PATH = "configs/${params.ENVIRONMENT}_inventory.ini"
     }
 
     stages {
@@ -22,7 +22,7 @@ pipeline {
             }
         }
 
-        stage('Extract Hosts from Inventory') {
+        stage('Get Hosts from Inventory') {
             steps {
                 script {
                     // Check if the inventory file exists
@@ -32,23 +32,22 @@ pipeline {
 
                     // Extract valid IPs or hostnames from the inventory file
                     def hostList = sh(
-                        script: """
-                        grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+|^[a-zA-Z]+' ${INVENTORY_PATH} | grep -v '^#' || true
-                        """,
+                        script: "grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+|^[a-zA-Z]+' ${INVENTORY_PATH} | grep -v '^#' || true",
                         returnStdout: true
                     ).trim().split('\n')
 
-                    // Validate if any hosts were found
+                    // Check if any hosts were found
                     if (hostList.size() == 0) {
                         error "No valid hosts found in ${INVENTORY_PATH}. Please ensure the inventory file contains valid host entries."
                     }
 
-                    // Dynamically present the hosts as a selection choice
+                    // Set the host choices for user input
+                    def hostChoices = hostList.collect { it.trim() } // Trim whitespace from each host
                     def selectedHost = input message: 'Select a host to deploy', parameters: [
-                        choice(name: 'HOST_FILTER', choices: hostList, description: 'Select a host to deploy')
+                        choice(name: 'HOST_FILTER', choices: hostChoices, description: 'Select a host to deploy')
                     ]
-                    
-                    // Save the selected host for further use
+
+                    // Save the selected host for later use
                     env.SELECTED_HOST = selectedHost
                 }
             }
@@ -57,23 +56,18 @@ pipeline {
         stage('Run Ansible Playbook') {
             steps {
                 script {
-                    // Define the mapping between friendly playbook names and actual file names
+                    // Define a mapping of friendly playbook names to their file paths
                     def playbookMap = [
                         'password-policy': 'password-policy_playbook.yml',
                         'install-docker': 'install-docker_playbook.yml',
                         'remove-kasperskyagent': 'remove-kasperskyagent_playbook.yml'
                     ]
 
-                    // Get the actual playbook file name based on the chosen friendly name
+                    // Determine the actual playbook file based on the selected friendly name
                     def playbookFile = playbookMap[params.PLAYBOOK]
 
                     if (!playbookFile) {
                         error "Playbook not found for selection: ${params.PLAYBOOK}"
-                    }
-
-                    // Check if the playbook exists
-                    if (!fileExists("Playbook/${playbookFile}")) {
-                        error "Playbook file not found: Playbook/${playbookFile}"
                     }
 
                     // Run the Ansible playbook with the selected host filter
