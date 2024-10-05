@@ -4,7 +4,6 @@ pipeline {
     parameters {
         choice(name: 'ENVIRONMENT', choices: ['PROD', 'UAT', 'SIT'], description: 'Choose the environment to deploy')
         choice(name: 'PLAYBOOK', choices: ['password-policy', 'install-docker', 'remove-kasperskyagent'], description: 'Choose the playbook to deploy')
-        string(name: 'HOST_FILTER', defaultValue: '', description: 'Enter a host or IP to filter (optional)')
     }
 
     stages {
@@ -17,24 +16,25 @@ pipeline {
         stage('Get Hosts from Inventory') {
             steps {
                 script {
-                    def inventoryPath = "configs/${params.ENVIRONMENT}_inventory.ini"
-                    def hostList = sh(script: "configs/get_hosts.sh ${inventoryPath}", returnStdout: true).trim().split('\n')
+                    // Use the environment parameter to set the correct inventory path
+                    def inventoryFile = "configs/${params.ENVIRONMENT}_inventory.ini"
                     
-                    // Add a prompt to select hosts
-                    def hostChoices = hostList.collect { it.trim() }
+                    // Run the get_hosts.sh script to fetch the list of hosts
+                    def hostList = sh(script: "bash configs/get_hosts.sh ${inventoryFile}", returnStdout: true).trim().split('\n')
+                    
+                    // Combine host list into a comma-separated string for user input
+                    def hostChoices = hostList.join(',')
+                    echo "Available hosts: ${hostChoices}"
+                    
+                    // Prompt user for input - note that this is a simple text input for hosts
                     def selectedHosts = input(
-                        id: 'hostInput', message: 'Select hosts to deploy', parameters: [
-                            [$class: 'CascadeChoiceParameter', name: 'SELECTED_HOSTS', 
-                             choiceType: 'PT_CHECKBOX', 
-                             filterLength: 1, 
-                             filterable: true, 
-                             choices: hostChoices, 
-                             description: 'Choose hosts to deploy']
-                        ]
+                        id: 'userInput', 
+                        message: 'Select hosts to deploy', 
+                        parameters: [string(name: 'SELECTED_HOSTS', defaultValue: hostChoices)]
                     )
-
-                    // Store selected hosts in a parameter
-                    currentBuild.description = "Selected Hosts: ${selectedHosts.join(', ')}" // For debugging
+                    
+                    // Store the selected hosts for later use
+                    currentBuild.description = "Selected Hosts: ${selectedHosts}"
                 }
             }
         }
@@ -42,17 +42,19 @@ pipeline {
         stage('Run Ansible Playbook') {
             steps {
                 script {
+                    // Prepare inventory file path and playbook mapping
                     def inventoryFile = "configs/${params.ENVIRONMENT}_inventory.ini"
                     def playbookMap = [
                         'password-policy': 'password-policy_playbook.yml',
                         'install-docker': 'install-docker_playbook.yml',
                         'remove-kasperskyagent': 'remove-kasperskyagent_playbook.yml'
                     ]
+
                     def playbookFile = playbookMap[params.PLAYBOOK]
 
-                    // Run the selected Ansible playbook with the chosen inventory and host filter
+                    // Run the selected Ansible playbook with the chosen inventory and selected hosts
                     sh """
-                    ansible-playbook -i ${inventoryFile} --limit ${selectedHosts.join(',')} Playbook/${playbookFile}
+                    ansible-playbook -i ${inventoryFile} --limit ${selectedHosts} Playbook/${playbookFile}
                     """
                 }
             }
