@@ -5,7 +5,8 @@ pipeline {
         choice(name: 'ENVIRONMENT', choices: ['PROD', 'UAT', 'SIT'], description: 'Choose the environment to deploy')
         choice(name: 'PLAYBOOK', choices: ['password-policy', 'install-docker', 'remove-kasperskyagent'], description: 'Choose the playbook to deploy')
         string(name: 'HOST_FILTER', defaultValue: '', description: 'Enter a host or IP to filter (optional)')
-        boolean(name: 'UPDATE_REPO', defaultValue: false, description: 'Check to update the repository from GitHub.')
+        choice(name: 'UPDATE_REPO', choices: ['No Update', 'Update Repo', 'Update Repo and Deploy'], description: 'Select to update the repository or not.')
+        
         // Use Extended Choice Parameter Plugin for host selection
         cascadeChoice(name: 'SELECTED_HOSTS', 
                       description: 'Select hosts to deploy', 
@@ -31,7 +32,7 @@ pipeline {
     stages {
         stage('Update Repository') {
             when {
-                expression { params.UPDATE_REPO == true }
+                expression { params.UPDATE_REPO == 'Update Repo' || params.UPDATE_REPO == 'Update Repo and Deploy' }
             }
             steps {
                 script {
@@ -51,6 +52,9 @@ pipeline {
         }
 
         stage('Run Ansible Playbook') {
+            when {
+                expression { params.UPDATE_REPO == 'Update Repo and Deploy' || params.UPDATE_REPO == 'No Update' }
+            }
             steps {
                 script {
                     def inventoryFile = "configs/${params.ENVIRONMENT}_inventory.ini"
