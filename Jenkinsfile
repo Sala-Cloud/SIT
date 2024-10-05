@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // Path to inventory file based on the environment
+        // Define the path to the inventory file based on the selected environment
         INVENTORY_PATH = "configs/${params.ENVIRONMENT}_inventory.ini"
     }
 
@@ -17,7 +17,7 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                // Clone the repository where the playbooks and inventory files are stored
+                // Clone the repository where the playbooks and inventory files are located
                 git branch: 'main', url: 'https://github.com/Sala-Cloud/SIT.git'
             }
         }
@@ -33,7 +33,7 @@ pipeline {
                     // Extract valid IPs or hostnames from the inventory file
                     def hostList = sh(
                         script: """
-                        grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+|^[a-zA-Z]+' ${INVENTORY_PATH} | grep -v '^#'
+                        grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+|^[a-zA-Z]+' ${INVENTORY_PATH} | grep -v '^#' || true
                         """,
                         returnStdout: true
                     ).trim().split('\n')
