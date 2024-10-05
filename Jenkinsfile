@@ -5,19 +5,17 @@ pipeline {
         // Choose the environment (inventory)
         choice(name: 'ENVIRONMENT', choices: ['PROD', 'UAT', 'SIT'], description: 'Choose the environment to deploy')
 
-        // Choose the playbook to run
+        // Choose the playbook to run with user-friendly names
         choice(name: 'PLAYBOOK', choices: ['password-policy', 'install-docker', 'remove-kasperskyagent'], description: 'Choose the playbook to deploy')
-    }
-
-    environment {
-        // Path to inventory file based on the selected environment
-        INVENTORY_PATH = "configs/${params.ENVIRONMENT}_inventory.ini"
+        
+        // Placeholder for host filter, which will be populated dynamically
+        string(name: 'HOST_FILTER', defaultValue: '', description: 'Host IP or hostname to deploy')
     }
 
     stages {
         stage('Clone Repository') {
             steps {
-                // Clone the repository where the playbooks and inventory files are located
+                // Checkout your repository where the playbooks and inventory files are located
                 git branch: 'main', url: 'https://github.com/Sala-Cloud/SIT.git'
             }
         }
@@ -25,30 +23,30 @@ pipeline {
         stage('Get Hosts from Inventory') {
             steps {
                 script {
-                    // Check if the inventory file exists
-                    if (!fileExists(INVENTORY_PATH)) {
-                        error "Inventory file not found: ${INVENTORY_PATH}"
-                    }
-
-                    // Extract valid IPs or hostnames from the inventory file
+                    // Determine the inventory file based on the selected environment
+                    def inventoryFile = "configs/${params.ENVIRONMENT}_inventory.ini"
+                    
+                    // Parse the inventory file to get the list of hosts (for simplicity, using grep)
                     def hostList = sh(
-                        script: "grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+|^[a-zA-Z]+' ${INVENTORY_PATH} | grep -v '^#' || true",
+                        script: "grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' ${inventoryFile}",
                         returnStdout: true
                     ).trim().split('\n')
 
                     // Check if any hosts were found
-                    if (hostList.size() == 0) {
-                        error "No valid hosts found in ${INVENTORY_PATH}. Please ensure the inventory file contains valid host entries."
+                    if (hostList.isEmpty()) {
+                        error "No hosts found in the inventory file: ${inventoryFile}"
                     }
 
-                    // Set the host choices for user input
-                    def hostChoices = hostList.collect { it.trim() } // Trim whitespace from each host
-                    def selectedHost = input message: 'Select a host to deploy', parameters: [
-                        choice(name: 'HOST_FILTER', choices: hostChoices, description: 'Select a host to deploy')
-                    ]
-
-                    // Save the selected host for later use
-                    env.SELECTED_HOST = selectedHost
+                    // Save the host list as choices for the HOST_FILTER parameter
+                    def hostChoices = hostList.join("\n")
+                    currentBuild.description = "Hosts: \n${hostChoices}" // For debugging
+                    
+                    // Dynamically create input parameters for host selection
+                    properties([
+                        parameters([
+                            string(name: 'HOST_FILTER', defaultValue: '', description: 'Choose a specific hostname or IP address to deploy')
+                        ])
+                    ])
                 }
             }
         }
@@ -56,35 +54,25 @@ pipeline {
         stage('Run Ansible Playbook') {
             steps {
                 script {
-                    // Define a mapping of friendly playbook names to their file paths
+                    // Determine the inventory file based on the selected environment
+                    def inventoryFile = "configs/${params.ENVIRONMENT}_inventory.ini"
+
+                    // Map friendly playbook names to actual file names
                     def playbookMap = [
                         'password-policy': 'password-policy_playbook.yml',
                         'install-docker': 'install-docker_playbook.yml',
                         'remove-kasperskyagent': 'remove-kasperskyagent_playbook.yml'
                     ]
 
-                    // Determine the actual playbook file based on the selected friendly name
+                    // Get the actual playbook file name based on the selected friendly name
                     def playbookFile = playbookMap[params.PLAYBOOK]
 
-                    if (!playbookFile) {
-                        error "Playbook not found for selection: ${params.PLAYBOOK}"
-                    }
-
-                    // Run the Ansible playbook with the selected host filter
+                    // Run the selected Ansible playbook with the chosen inventory and host filter
                     sh """
-                    ansible-playbook -i ${INVENTORY_PATH} --limit ${env.SELECTED_HOST} Playbook/${playbookFile}
+                    ansible-playbook -i ${inventoryFile} --limit ${params.HOST_FILTER} -u Sysadmin Playbook/${playbookFile}
                     """
                 }
             }
-        }
-    }
-
-    post {
-        always {
-            echo "Job finished with status: ${currentBuild.currentResult}"
-        }
-        failure {
-            echo "Build failed! Please check the logs for errors."
         }
     }
 }
