@@ -6,6 +6,26 @@ pipeline {
         choice(name: 'PLAYBOOK', choices: ['password-policy', 'install-docker', 'remove-kasperskyagent'], description: 'Choose the playbook to deploy')
         string(name: 'HOST_FILTER', defaultValue: '', description: 'Enter a host or IP to filter (optional)')
         boolean(name: 'UPDATE_REPO', defaultValue: false, description: 'Check to update the repository from GitHub.')
+        // Use Extended Choice Parameter Plugin for host selection
+        cascadeChoice(name: 'SELECTED_HOSTS', 
+                      description: 'Select hosts to deploy', 
+                      choiceType: 'PT_CHECKBOX', 
+                      filterLength: 1, 
+                      filterable: true, 
+                      randomName: 'selectedHosts', 
+                      script: [
+                          classpath: [],
+                          fallbackScript: [
+                              class: 'org.codehaus.groovy.runtime.ScriptBytecodeAdapter$WrappedClosure',
+                              script: "return ['No hosts available']"
+                          ],
+                          script: [
+                              class: 'org.codehaus.groovy.runtime.ScriptBytecodeAdapter$WrappedClosure',
+                              script: "def inventoryFile = \"configs/${params.ENVIRONMENT}_inventory.ini\"; \
+                                        def hostList = sh(script: \"bash configs/get_hosts.sh ${inventoryFile}\", returnStdout: true).trim().split('\\n'); \
+                                        return hostList"
+                          ]
+                      ])
     }
 
     stages {
@@ -24,28 +44,8 @@ pipeline {
         stage('Get Hosts from Inventory') {
             steps {
                 script {
-                    def inventoryFile = "configs/${params.ENVIRONMENT}_inventory.ini"
-                    def hostList = sh(script: "bash configs/get_hosts.sh ${inventoryFile}", returnStdout: true).trim().split('\n')
-                    
-                    // Filter the host list based on the user input
-                    def filteredHosts = hostList.findAll { host ->
-                        host.contains(params.HOST_FILTER)
-                    }
-
-                    if (filteredHosts.isEmpty()) {
-                        error("No hosts found matching the filter: ${params.HOST_FILTER}")
-                    } else {
-                        def hostChoices = filteredHosts.join(',')
-                        echo "Available hosts: ${hostChoices}"
-                        
-                        def selectedHosts = input(
-                            id: 'userInput', 
-                            message: 'Select hosts to deploy', 
-                            parameters: [string(name: 'SELECTED_HOSTS', defaultValue: hostChoices)]
-                        )
-                        
-                        currentBuild.description = "Selected Hosts: ${selectedHosts}"
-                    }
+                    // This stage is now handled by the Extended Choice Parameter in the parameters block
+                    echo "Selected Hosts: ${params.SELECTED_HOSTS}"
                 }
             }
         }
