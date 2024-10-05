@@ -13,7 +13,7 @@
             steps {
                 // Example: Run Ansible with the inventory located in 'configs/inventory.ini'
                 sh '''
-                ansible-playbook -i configs/inventory.ini your_playbook.yml
+                ansible-playbook -i configs/inventory.ini Playbook/install-apache-container.yml
                 '''
             }
         }
