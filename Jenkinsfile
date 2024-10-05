@@ -30,22 +30,25 @@ pipeline {
                         error "Inventory file not found: ${INVENTORY_PATH}"
                     }
 
-                    // Extract hostnames or IPs from the selected inventory file
+                    // Extract valid IPs or hostnames from the inventory file
                     def hostList = sh(
-                        script: "grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' ${INVENTORY_PATH} || grep -E '^[a-zA-Z0-9-]+' ${INVENTORY_PATH}",
+                        script: """
+                        grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+|^[a-zA-Z]+' ${INVENTORY_PATH} | grep -v '^#'
+                        """,
                         returnStdout: true
                     ).trim().split('\n')
 
+                    // Validate if any hosts were found
                     if (hostList.size() == 0) {
-                        error "No valid hosts found in ${INVENTORY_PATH}"
+                        error "No valid hosts found in ${INVENTORY_PATH}. Please ensure the inventory file contains valid host entries."
                     }
 
-                    // Show the available hosts as part of the input prompt
+                    // Dynamically present the hosts as a selection choice
                     def selectedHost = input message: 'Select a host to deploy', parameters: [
                         choice(name: 'HOST_FILTER', choices: hostList, description: 'Select a host to deploy')
                     ]
                     
-                    // Save selected host to the environment
+                    // Save the selected host for further use
                     env.SELECTED_HOST = selectedHost
                 }
             }
