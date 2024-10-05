@@ -25,6 +25,11 @@ pipeline {
         stage('Extract Hosts from Inventory') {
             steps {
                 script {
+                    // Check if the inventory file exists
+                    if (!fileExists(INVENTORY_PATH)) {
+                        error "Inventory file not found: ${INVENTORY_PATH}"
+                    }
+
                     // Extract hostnames or IPs from the selected inventory file
                     def hostList = sh(
                         script: "grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' ${INVENTORY_PATH} || grep -E '^[a-zA-Z0-9-]+' ${INVENTORY_PATH}",
@@ -63,12 +68,26 @@ pipeline {
                         error "Playbook not found for selection: ${params.PLAYBOOK}"
                     }
 
+                    // Check if the playbook exists
+                    if (!fileExists("Playbook/${playbookFile}")) {
+                        error "Playbook file not found: Playbook/${playbookFile}"
+                    }
+
                     // Run the Ansible playbook with the selected host filter
                     sh """
                     ansible-playbook -i ${INVENTORY_PATH} --limit ${env.SELECTED_HOST} Playbook/${playbookFile}
                     """
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo "Job finished with status: ${currentBuild.currentResult}"
+        }
+        failure {
+            echo "Build failed! Please check the logs for errors."
         }
     }
 }
