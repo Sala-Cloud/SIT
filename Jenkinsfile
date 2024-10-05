@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // Path to the inventory file based on the environment
+        // Path to inventory file based on the environment
         INVENTORY_PATH = "configs/${params.ENVIRONMENT}_inventory.ini"
     }
 
@@ -17,7 +17,7 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                // Clone the GitHub repository where the playbooks and inventory files are stored
+                // Clone the repository where the playbooks and inventory files are stored
                 git branch: 'main', url: 'https://github.com/Sala-Cloud/SIT.git'
             }
         }
@@ -25,7 +25,7 @@ pipeline {
         stage('Extract Hosts from Inventory') {
             steps {
                 script {
-                    // Extract hostnames or IP addresses from the selected inventory file
+                    // Extract hostnames or IPs from the selected inventory file
                     def hostList = sh(
                         script: "grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' ${INVENTORY_PATH} || grep -E '^[a-zA-Z0-9-]+' ${INVENTORY_PATH}",
                         returnStdout: true
@@ -35,16 +35,13 @@ pipeline {
                         error "No valid hosts found in ${INVENTORY_PATH}"
                     }
 
-                    // Create a list of hosts and dynamically set the HOST_FILTER parameter
-                    def hostChoices = hostList.join("\n")
-                    currentBuild.description = "Available Hosts: \n${hostChoices}"  // Display the hosts in the build description for debugging
-
-                    // Update the pipeline to prompt the user to select a specific host
-                    properties([
-                        parameters([
-                            choice(name: 'HOST_FILTER', choices: hostList, description: 'Choose a specific hostname or IP address to deploy')
-                        ])
-                    ])
+                    // Show the available hosts as part of the input prompt
+                    def selectedHost = input message: 'Select a host to deploy', parameters: [
+                        choice(name: 'HOST_FILTER', choices: hostList, description: 'Select a host to deploy')
+                    ]
+                    
+                    // Save selected host to the environment
+                    env.SELECTED_HOST = selectedHost
                 }
             }
         }
@@ -52,22 +49,6 @@ pipeline {
         stage('Run Ansible Playbook') {
             steps {
                 script {
-                    // Define a map for friendly playbook names to actual file names
+                    // Define the mapping between friendly playbook names and actual file names
                     def playbookMap = [
-                        'password-policy': 'password-policy_playbook.yml',
-                        'install-docker': 'install-docker_playbook.yml',
-                        'remove-kasperskyagent': 'remove-kasperskyagent_playbook.yml'
-                    ]
-
-                    // Fetch the actual playbook filename based on the selected friendly name
-                    def playbookFile = playbookMap[params.PLAYBOOK]
-
-                    // Run the selected Ansible playbook using the chosen inventory and host filter
-                    sh """
-                    ansible-playbook -i ${INVENTORY_PATH} --limit ${params.HOST_FILTER} Playbook/${playbookFile}
-                    """
-                }
-            }
-        }
-    }
-}
+      
