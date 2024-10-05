@@ -1,5 +1,10 @@
-    pipeline {
+pipeline {
     agent any
+
+    // Define a parameter to select the environment
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['production', 'uat'], description: 'Choose the environment to deploy')
+    }
 
     stages {
         stage('Clone Repository') {
@@ -11,10 +16,15 @@
 
         stage('Run Ansible Playbook') {
             steps {
-                // Example: Run Ansible with the inventory located in 'configs/inventory.ini'
-                sh '''
-                ansible-playbook -i configs/inventory.ini Playbook/install-apache-container.yml
-                '''
+                script {
+                    // Determine the inventory file based on the selected environment
+                    def inventoryFile = "configs/${params.ENVIRONMENT}_inventory.ini"
+                    
+                    // Run the Ansible playbook with the selected inventory
+                    sh """
+                    ansible-playbook -i ${inventoryFile} Playbook/install-apache-container.yml
+                    """
+                }
             }
         }
     }
