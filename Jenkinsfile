@@ -7,9 +7,6 @@ pipeline {
 
         // Choose the playbook to run with user-friendly names
         choice(name: 'PLAYBOOK', choices: ['password-policy', 'install-docker', 'remove-kasperskyagent'], description: 'Choose the playbook to deploy')
-        
-        // Placeholder for host filter, which will be populated dynamically
-        string(name: 'HOST_FILTER', defaultValue: '', description: 'Host IP or hostname to deploy')
     }
 
     stages {
@@ -26,7 +23,7 @@ pipeline {
                     // Determine the inventory file based on the selected environment
                     def inventoryFile = "configs/${params.ENVIRONMENT}_inventory.ini"
                     
-                    // Parse the inventory file to get the list of hosts (for simplicity, using grep)
+                    // Parse the inventory file to get the list of hosts
                     def hostList = sh(
                         script: "grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' ${inventoryFile}",
                         returnStdout: true
@@ -37,16 +34,16 @@ pipeline {
                         error "No hosts found in the inventory file: ${inventoryFile}"
                     }
 
-                    // Save the host list as choices for the HOST_FILTER parameter
-                    def hostChoices = hostList.join("\n")
-                    currentBuild.description = "Hosts: \n${hostChoices}" // For debugging
-                    
-                    // Dynamically create input parameters for host selection
-                    properties([
-                        parameters([
-                            string(name: 'HOST_FILTER', defaultValue: '', description: 'Choose a specific hostname or IP address to deploy')
-                        ])
-                    ])
+                    // Show the list of hosts for user selection
+                    def hostChoices = hostList.collect { it.trim() }
+                    def selectedHost = input(
+                        id: 'userInput', message: 'Select a host to deploy', parameters: [
+                            [$class: 'ChoiceParameterDefinition', name: 'HOST_FILTER', choices: hostChoices, description: 'Choose a specific hostname or IP address to deploy']
+                        ]
+                    )
+
+                    // Store the selected host for later use
+                    env.HOST_FILTER = selectedHost
                 }
             }
         }
@@ -69,7 +66,7 @@ pipeline {
 
                     // Run the selected Ansible playbook with the chosen inventory and host filter
                     sh """
-                    ansible-playbook -i ${inventoryFile} --limit ${params.HOST_FILTER} -u Sysadmin Playbook/${playbookFile}
+                    ansible-playbook -i ${inventoryFile} --limit ${env.HOST_FILTER} -u Sysadmin Playbook/${playbookFile}
                     """
                 }
             }
