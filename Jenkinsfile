@@ -34,16 +34,20 @@ pipeline {
                         error "No hosts found in the inventory file: ${inventoryFile}"
                     }
 
-                    // Show the list of hosts for user selection
-                    def hostChoices = hostList.collect { it.trim() }
-                    def selectedHost = input(
-                        id: 'userInput', message: 'Select a host to deploy', parameters: [
-                            [$class: 'ChoiceParameterDefinition', name: 'HOST_FILTER', choices: hostChoices, description: 'Choose a specific hostname or IP address to deploy']
-                        ]
+                    // Create a checkbox input for the hosts
+                    def selectedHosts = input(
+                        id: 'userInput', message: 'Select hosts to deploy', parameters: hostList.collect { host ->
+                            [$class: 'BooleanParameterDefinition', name: host.trim(), defaultValue: false, description: "Deploy to ${host.trim()}"]
+                        }
                     )
 
-                    // Store the selected host for later use
-                    env.HOST_FILTER = selectedHost
+                    // Filter selected hosts
+                    def selectedHostList = hostList.findAll { host ->
+                        selectedHosts[host.trim()]
+                    }
+
+                    // Store the selected hosts as a string for later use
+                    env.HOST_FILTER = selectedHostList.join(',')
                 }
             }
         }
