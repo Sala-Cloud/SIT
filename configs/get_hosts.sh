@@ -2,7 +2,7 @@
 
 # get_hosts.sh
 # Usage: ./get_hosts.sh inventory_file
-
+cat "$INVENTORY_FILE"
 INVENTORY_FILE=$1
 
 # Check if the inventory file exists
