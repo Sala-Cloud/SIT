@@ -1,0 +1,18 @@
+- hosts: docker_hosts
+  become: yes
+  tasks:
+    # Install Docker Engine on inventory.ini name docker_hosts
+    - name: Ensure Docker is installed
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Start Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    # Include container config (optional)
+    # - name: Include Containers config
+    #   include_tasks: containcer-config.yml

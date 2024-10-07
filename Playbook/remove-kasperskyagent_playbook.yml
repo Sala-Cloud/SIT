@@ -1,0 +1,25 @@
+- hosts: docker_hosts
+  become: yes
+  tasks:
+    # Ensure Docker is installed
+    - name: Ensure Docker is installed
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    # Pull the official Apache Docker image
+    - name: Pull Apache image
+      docker_image:
+        name: httpd
+        tag: latest
+        source: pull
+
+    # Run the Apache container
+    - name: Run Apache container
+      docker_container:
+        name: apache2
+        image: httpd:latest
+        state: started
+        ports:
+          - "8080:80"
